@@ -104,7 +104,7 @@ contract Timelock is TimelockInterface {
         return returnData;
     }
 
-    function getBlockTimestamp() internal view returns (uint) {
+    function getBlockTimestamp() public view returns (uint) {
         // solium-disable-next-line security/no-block-members
         return block.timestamp;
     }

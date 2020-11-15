@@ -1,7 +1,7 @@
 const {
     encodeParameters,
     etherUnsigned,
-    freezeTime,
+    increaseTime,
     keccak256
 } = require('./utils/Ethereum');
 
@@ -9,7 +9,6 @@ const Timelock = artifacts.require("Timelock");
 
 const twoDayInSeconds = etherUnsigned(2 * 24 * 60 * 60);
 const zero = etherUnsigned(0);
-const gracePeriod = twoDayInSeconds.multipliedBy(2);
 
 contract("Timelock", accounts => {
     let root, notAdmin, newAdmin;
@@ -21,7 +20,6 @@ contract("Timelock", accounts => {
     let value = zero;
     let signature = 'setDelay(uint256)';
     let data = encodeParameters(['uint256'], [newDelay.toFixed()]);
-    let revertData = encodeParameters(['uint256'], [etherUnsigned(60 * 60).toFixed()]);
     let eta;
     let queuedTxHash;
 
@@ -29,8 +27,7 @@ contract("Timelock", accounts => {
         [root, notAdmin, newAdmin] = accounts;
         timelock = await Timelock.new(root, delay);
     
-        blockTimestamp = etherUnsigned(100);
-        await freezeTime(blockTimestamp.toNumber());
+        blockTimestamp = etherUnsigned(await timelock.getBlockTimestamp());
         target = timelock.address;
         eta = blockTimestamp.plus(delay);
     
@@ -44,13 +41,92 @@ contract("Timelock", accounts => {
 
     describe('constructor', () => {
         it('sets address of admin', async () => {
-            let configuredAdmin = await timelock.admin()
+            let configuredAdmin = await timelock.admin();
             expect(configuredAdmin).equal(root);
         });
     
         it('sets delay', async () => {
             let configuredDelay = await timelock.delay();
             expect(configuredDelay.toString()).equal(delay.toString());
+        });
+    });
+
+    describe('setDelay', () => {
+        it('requires msg.sender to be Timelock', async () => {
+            try {
+                await timelock.setDelay(delay, { from: root });
+                assert.fail();
+            } catch (e) {
+                expect(e.reason).equal('Timelock::setDelay: Call must come from Timelock.');
+            }
+        });
+    });
+
+    describe('cancelTransaction', () => {
+        beforeEach(async () => {
+            await timelock.queueTransaction(target, value, signature, data, eta, { from: root });
+        });
+
+        it('requires admin to be msg.sender', async () => {
+            try {
+                await timelock.cancelTransaction(target, value, signature, data, eta, { from: notAdmin });
+            } catch (e) {
+                expect(e.reason).equal('Timelock::cancelTransaction: Call must come from admin.');
+            }
+        });
+
+        it('should emit CancelTransaction event', async () => {
+            const result = await timelock.cancelTransaction(target, value, signature, data, eta, {
+                from: root
+            });
+      
+            expect(result.logs[0].args).contain({
+                data,
+                signature,
+                target,
+                txHash: queuedTxHash,
+            });
+        });
+    });
+
+    describe('executeTransaction (setDelay)', () => {
+        beforeEach(async () => {
+            // Queue transaction that will succeed
+            await timelock.queueTransaction(target, value, signature, data, eta, {
+                from: root
+            });
+        });
+
+        it('requires transaction to be queued', async () => {
+            const differentEta = eta.plus(1);
+
+            try {
+                await timelock.executeTransaction(target, value, signature, data, differentEta, {
+                    from: root
+                });
+                assert.fail();
+            } catch (e) {
+                expect(e.reason).equal("Timelock::executeTransaction: Transaction hasn't been queued.");
+            }
+        });
+      
+        it('requires timestamp to be greater than or equal to eta', async () => {
+            try {
+                await timelock.executeTransaction(target, value, signature, data, eta, {
+                    from: root
+                });
+                assert.fail();
+            } catch (e) {
+                expect(e.reason).equal("Timelock::executeTransaction: Transaction hasn't surpassed time lock.");
+            }
+        });
+
+        it('requires target.call transaction to succeed', async () => {
+            await increaseTime(twoDayInSeconds.plus(1).toNumber());
+
+            await timelock.executeTransaction(target, value, signature, data, eta, {
+                from: root
+            });
         });
     });
 });
