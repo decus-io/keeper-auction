@@ -38,6 +38,7 @@ contract KeeperAuction is Ownable {
     }
 
     event Bidded(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount, uint256 power);
+    event Canceled(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount, uint256 power);
 
     mapping(address => Token) public tokens;
     mapping(address => UserBids) public userBids;
@@ -84,11 +85,46 @@ contract KeeperAuction is Ownable {
     }
 
     function cancel(uint _index) public {
-        // TODO
+        require(bids.length > _index, "KeeperAuction::cancel: Unknow bid index");
+        Bid memory _bid = bids[_index];
+        require(_bid.live, "KeeperAuction::cancel: Bid already canceled");
+        require(msg.sender == _bid.owner, "KeeperAuction::cancel: Bid owner canceled");
+
+        ERC20Interface token = ERC20Interface(_bid.token);
+        require(token.transfer(msg.sender, _bid.amount), "KeeperAuction::cancel: Transfer back fail");
+        bids[_index].live = false;
+        userBids[msg.sender].power = userBids[msg.sender].power.sub(_bid.power);
+        emit Canceled(msg.sender, _bid.bidType, _bid.index, _bid.token, _bid.amount, _bid.power);
     }
 
-    function bidderPower(address keeper) public view returns (uint256) {
-        return userBids[keeper].power;
+    function getBid(uint _index) public view returns (
+        address owner,
+        bool live,
+        bool selected,
+        BidType bidType,
+        uint index,
+        address token,
+        uint256 amount,
+        uint256 power) {
+        Bid memory _bid = bids[_index];
+        return (
+            _bid.owner,
+            _bid.live,
+            _bid.selected,
+            _bid.bidType,
+            _bid.index,
+            _bid.token,
+            _bid.amount,
+            _bid.power
+        );
+    }
+
+    function bidderPower(address bidder) public view returns (uint256) {
+        return userBids[bidder].power;
+    }
+
+    function userBidsIndex(address bidder) public view returns (uint[] memory) {
+        return userBids[bidder].bids;
     }
 
     function bidderCount() public view returns (uint) {
