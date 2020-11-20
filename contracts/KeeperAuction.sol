@@ -33,11 +33,13 @@ contract KeeperAuction is Ownable {
         uint index;
         address token;
         uint256 amount;
+        uint256 vAmount;
         uint256 selectdAmount;
     }
 
     struct UserBids {
         bool selected;
+        uint256 amount;
         uint[] bids;
     }
 
@@ -81,10 +83,11 @@ contract KeeperAuction is Ownable {
         require(token.transferFrom(msg.sender, address(this), _amount), "KeeperAuction::bid: transferFrom fail");
 
         uint cIndex = bids.length;
-        bids.push(Bid(msg.sender, true, _type, cIndex, _token, _amount, 0));
+        bids.push(Bid(msg.sender, true, _type, cIndex, _token, _amount, vAmount, 0));
         if (userBids[msg.sender].bids.length == 0) {
             bidders.push(msg.sender);
         }
+        userBids[msg.sender].amount = userBids[msg.sender].amount.add(vAmount);
         userBids[msg.sender].bids.push(cIndex);
         emit Bidded(msg.sender, _type, cIndex, _token, _amount);
     }
@@ -98,6 +101,7 @@ contract KeeperAuction is Ownable {
         ERC20Interface token = ERC20Interface(_bid.token);
         require(token.transfer(msg.sender, _bid.amount), "KeeperAuction::cancel: Transfer back fail");
         bids[_index].live = false;
+        userBids[msg.sender].amount = userBids[msg.sender].amount.sub(_bid.vAmount);
         emit Canceled(msg.sender, _bid.bidType, _bid.index, _bid.token, _bid.amount);
     }
 
@@ -166,21 +170,7 @@ contract KeeperAuction is Ownable {
     }
 
     function bidderAmount(address bidder) public view returns (uint256) {
-        uint256 result = 0;
-        for (uint i = 0; i < userBids[bidder].bids.length; i++) {
-            Bid memory _bid = bids[userBids[bidder].bids[i]];
-            if (!_bid.live) {
-                continue;
-            }
-            uint256 amount = _bid.amount;
-            uint decimals = tokens[_bid.token].decimals;
-            if (decimals > DECIMALS) {
-                amount = _bid.amount.div(10**(decimals - DECIMALS));
-            }
-
-            result = result.add(amount);
-        }
-        return result;
+        return userBids[bidder].amount;
     }
 
     function userBidsIndex(address bidder) public view returns (uint[] memory) {
@@ -205,7 +195,21 @@ contract KeeperAuction is Ownable {
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
         require(position >= candidates.length, "KeeperAuction::end: position to large");
 
-        // TODO
+        uint256 minimum = 0;
+        UserBids[] memory result = new UserBids[](0);
+        for (uint i = 0; i < bidders.length; i++) {
+            uint256 amount = bidderAmount(bidders[i]);
+            if (minimum >= amount) {
+                continue;
+            }
+
+            UserBids memory item = userBids(bidders[i]);
+            if (result.length < position) {
+                // TODO
+            } else {
+
+            }
+        }
     }
 
     function getBlockTimestamp() public view returns (uint) {
