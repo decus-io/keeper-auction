@@ -6,6 +6,7 @@ import "./ERC20Interface.sol";
 
 contract KeeperAuction is Ownable {
     using SafeMath for uint256;
+    using SafeMath for uint;
 
     enum BidType {MONTH_3, MONTH_6, MONTH_12}
 
@@ -14,6 +15,10 @@ contract KeeperAuction is Ownable {
     uint public constant POWER_MONTH_6 = 15;
     uint public constant POWER_MONTH_12 = 20;
     uint256 public constant MIN_AMOUNT = 50000000;
+
+    // timelock
+    uint public constant MINIMUM_DELAY = 1 days;
+    uint public constant MAXIMUM_DELAY = 5 days;
 
     struct Token {
         bool exist;
@@ -39,11 +44,13 @@ contract KeeperAuction is Ownable {
     event Bidded(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
     event Canceled(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
     event Refund(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
+    event CandidatesSeleted(address[] candidates, uint deadline);
 
     mapping(address => Token) public tokens;
     mapping(address => UserBids) public userBids;
     Bid[] public bids;
     address[] public bidders;
+    uint public deadline;
     address[] public candidates;
     bool public completed;
 
@@ -182,5 +189,27 @@ contract KeeperAuction is Ownable {
 
     function bidderCount() public view returns (uint) {
         return bidders.length;
+    }
+
+    // Owner oprations
+    function selectCandidates(address[] memory _candidates, uint _deadline) public onlyOwner {
+        require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::selectCandidates: deadline error");
+        require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::selectCandidates: deadline too large");
+
+        candidates = _candidates;
+        deadline = _deadline;
+        emit CandidatesSeleted(_candidates, _deadline);
+    }
+
+    function end(address target, uint position) public onlyOwner {
+        require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
+        require(position >= candidates.length, "KeeperAuction::end: position to large");
+
+        // TODO
+    }
+
+    function getBlockTimestamp() public view returns (uint) {
+        // solium-disable-next-line security/no-block-members
+        return block.timestamp;
     }
 }
