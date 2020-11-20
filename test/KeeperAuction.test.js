@@ -36,7 +36,6 @@ contract("KeeperAuction", accounts => {
 
             const result = await auction.bid(0, hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
 
-            expect(result.logs[0].args.power.toString()).equals("1000000000");
             hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("1000000000001234567");
         });
