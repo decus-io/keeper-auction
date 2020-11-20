@@ -38,6 +38,7 @@ contract KeeperAuction is Ownable {
 
     event Bidded(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
     event Canceled(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
+    event Refund(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
 
     mapping(address => Token) public tokens;
     mapping(address => UserBids) public userBids;
@@ -57,6 +58,8 @@ contract KeeperAuction is Ownable {
     }
 
     function bid(BidType _type, address _token, uint256 _amount) public {
+        require(!completed, "KeeperAuction::bid: bid already completed");
+
         Token memory vToken = tokens[_token];
         require(vToken.exist, "KeeperAuction::bid: Unknow token");
 
@@ -92,7 +95,22 @@ contract KeeperAuction is Ownable {
     }
 
     function refund() public {
-        
+        require(completed, "KeeperAuction::refund: refund not open");
+        for (uint i = 0; i < userBids[msg.sender].bids.length; i++) {
+            Bid memory _bid = bids[userBids[msg.sender].bids[i]];
+            if (!_bid.live) {
+                continue;
+            }
+
+            uint256 refundAmount = _bid.amount.sub(_bid.selectdAmount);
+            if (refundAmount == 0) {
+                continue;
+            }
+            ERC20Interface token = ERC20Interface(_bid.token);
+            require(token.transfer(msg.sender, refundAmount), "KeeperAuction::refund: Transfer back fail");
+            bids[_bid.index].live = false;
+            emit Refund(msg.sender, _bid.bidType, _bid.index, _bid.token, refundAmount);
+        }
     }
 
     function getBid(uint _index) public view returns (
