@@ -54,10 +54,8 @@ contract KeeperAuction is Ownable {
     address[] public bidders;
     uint public deadline;
     address[] public candidates;
-    bool public completed;
 
     constructor(address[] memory _tokens) public {
-        completed = false;
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);
             uint8 decimals = token.decimals();
@@ -67,7 +65,7 @@ contract KeeperAuction is Ownable {
     }
 
     function bid(BidType _type, address _token, uint256 _amount) public {
-        require(!completed, "KeeperAuction::bid: bid already completed");
+        require(candidates.length == 0, "KeeperAuction::bid: stop bid");
 
         Token memory vToken = tokens[_token];
         require(vToken.exist, "KeeperAuction::bid: Unknow token");
@@ -106,7 +104,6 @@ contract KeeperAuction is Ownable {
     }
 
     function refund() public {
-        require(completed, "KeeperAuction::refund: refund not open");
         for (uint i = 0; i < userBids[msg.sender].bids.length; i++) {
             Bid memory _bid = bids[userBids[msg.sender].bids[i]];
             if (!_bid.live) {
@@ -195,21 +192,34 @@ contract KeeperAuction is Ownable {
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
         require(position >= candidates.length, "KeeperAuction::end: position to large");
 
-        uint256 minimum = 0;
-        UserBids[] memory result = new UserBids[](0);
-        for (uint i = 0; i < bidders.length; i++) {
-            uint256 amount = bidderAmount(bidders[i]);
-            if (minimum >= amount) {
+        UserBids[] memory result = new UserBids[](position);
+        uint length = 0;
+        for (uint i = 0; i < candidates.length; i++) {
+            uint256 amount = bidderAmount(candidates[i]);
+            if (amount == 0 || (length == position && result[length - 1].amount >= amount)) {
                 continue;
             }
 
-            UserBids memory item = userBids(bidders[i]);
-            if (result.length < position) {
-                // TODO
+            UserBids memory item = userBids[candidates[i]];
+            if (length < position) {
+                result[length] = item;
+                length++;
             } else {
-
+                result[length - 1] = item;
+            }
+            for (uint k = length - 1; k > 0; k--) {
+                if (result[k - 1].amount < result[k].amount) {
+                    UserBids memory temp = result[k];
+                    result[k] = result[k - 1];
+                    result[k - 1] = temp;
+                } else {
+                    break;
+                }
             }
         }
+
+        require(position == length, "KeeperAuction::end: Insufficient seats");
+        // TODO
     }
 
     function getBlockTimestamp() public view returns (uint) {
