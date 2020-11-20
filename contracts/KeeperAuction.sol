@@ -97,10 +97,11 @@ contract KeeperAuction is Ownable {
         require(msg.sender == _bid.owner, "KeeperAuction::cancel: Bid owner canceled");
 
         ERC20Interface token = ERC20Interface(_bid.token);
-        require(token.transfer(msg.sender, _bid.amount), "KeeperAuction::cancel: Transfer back fail");
+        uint256 cancelAmount = _bid.amount.sub(_bid.selectdAmount);
+        require(token.transfer(msg.sender, cancelAmount), "KeeperAuction::cancel: Transfer back fail");
         bids[_index].live = false;
         userBids[msg.sender].amount = userBids[msg.sender].amount.sub(_bid.vAmount);
-        emit Canceled(msg.sender, _bid.bidType, _bid.index, _bid.token, _bid.amount);
+        emit Canceled(msg.sender, _bid.bidType, _bid.index, _bid.token, cancelAmount);
     }
 
     function refund() public {
