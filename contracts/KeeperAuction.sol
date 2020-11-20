@@ -13,7 +13,7 @@ contract KeeperAuction is Ownable {
     uint public constant POWER_MONTH_3 = 10;
     uint public constant POWER_MONTH_6 = 15;
     uint public constant POWER_MONTH_12 = 20;
-    uint public constant POSITION = 30;
+    uint256 public constant MIN_AMOUNT = 50000000;
 
     struct Token {
         bool exist;
@@ -28,6 +28,7 @@ contract KeeperAuction is Ownable {
         uint index;
         address token;
         uint256 amount;
+        uint256 selectdAmount;
     }
 
     struct UserBids {
@@ -56,12 +57,21 @@ contract KeeperAuction is Ownable {
     }
 
     function bid(BidType _type, address _token, uint256 _amount) public {
-        require(tokens[_token].exist, "KeeperAuction::bid: Unknow token");
+        Token memory vToken = tokens[_token];
+        require(vToken.exist, "KeeperAuction::bid: Unknow token");
+
+        uint256 vAmount = _amount;
+        uint decimals = vToken.decimals;
+        if (decimals > DECIMALS) {
+            vAmount = _amount.div(10**(decimals - DECIMALS));
+        }
+        require(vAmount >= MIN_AMOUNT, "KeeperAuction::bid: too small amount");
+
         ERC20Interface token = ERC20Interface(_token);
         require(token.transferFrom(msg.sender, address(this), _amount), "KeeperAuction::bid: transferFrom fail");
 
         uint cIndex = bids.length;
-        bids.push(Bid(msg.sender, true, _type, cIndex, _token, _amount));
+        bids.push(Bid(msg.sender, true, _type, cIndex, _token, _amount, 0));
         if (userBids[msg.sender].bids.length == 0) {
             bidders.push(msg.sender);
         }
@@ -126,6 +136,24 @@ contract KeeperAuction is Ownable {
 
             power = power.mul(rate);
             result = result.add(power);
+        }
+        return result;
+    }
+
+    function bidderAmount(address bidder) public view returns (uint256) {
+        uint256 result = 0;
+        for (uint i = 0; i < userBids[bidder].bids.length; i++) {
+            Bid memory _bid = bids[userBids[bidder].bids[i]];
+            if (!_bid.live) {
+                continue;
+            }
+            uint256 amount = _bid.amount;
+            uint decimals = tokens[_bid.token].decimals;
+            if (decimals > DECIMALS) {
+                amount = _bid.amount.div(10**(decimals - DECIMALS));
+            }
+
+            result = result.add(amount);
         }
         return result;
     }
