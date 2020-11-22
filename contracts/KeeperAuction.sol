@@ -55,6 +55,7 @@ contract KeeperAuction is Ownable {
     event Canceled(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
     event Refund(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
     event CandidatesSeleted(address[] candidates, uint deadline);
+    event AuctionEnd(address[] tokens, uint256[] amount, address[] keepers);
 
     mapping(address => Token) public tokens;
     mapping(address => UserBids) public userBids;
@@ -273,6 +274,7 @@ contract KeeperAuction is Ownable {
         }
         KeeperHolderInterface holder = KeeperHolderInterface(target);
         require(holder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
+        emit AuctionEnd(_tokens, _amounts, keepers);
     }
 
     function getBlockTimestamp() public view returns (uint) {
