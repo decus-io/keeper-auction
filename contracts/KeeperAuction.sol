@@ -41,7 +41,6 @@ contract KeeperAuction is Ownable {
 
     struct UserBids {
         address holder;
-        bool selected;
         uint256 amount;
         uint[] bids;
     }
@@ -192,6 +191,10 @@ contract KeeperAuction is Ownable {
         return bidders.length;
     }
 
+    function biddable() public view returns (bool) {
+        return candidates.length == 0;
+    }
+
     // Owner oprations
     function selectCandidates(address[] memory _candidates, uint _deadline) public onlyOwner {
         require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::selectCandidates: deadline error");
@@ -252,11 +255,11 @@ contract KeeperAuction is Ownable {
                     selectedAmount = selectedAmount.add(item.vAmount);
                     itemAmount = item.vAmount;
                 }
-                item.selectdAmount = selectedAmount;
+                bids[result[i].bids[j]].selectdAmount = selectedAmount;
                 if (token.decimals > DECIMALS) {
-                    item.selectdAmount = selectedAmount.mul(10**(token.decimals - DECIMALS));
+                    bids[result[i].bids[j]].selectdAmount = selectedAmount.mul(10**(token.decimals - DECIMALS));
                 }
-                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(item.selectdAmount);
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[result[i].bids[j]].selectdAmount);
 
                 if (selectedAmount == min) {
                     break;
