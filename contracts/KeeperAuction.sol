@@ -3,6 +3,7 @@ pragma solidity ^0.5.16;
 import "./utils/SafeMath.sol";
 import "./utils/Ownable.sol";
 import "./ERC20Interface.sol";
+import "./KeeperHolderInterface.sol";
 
 contract KeeperAuction is Ownable {
     using SafeMath for uint256;
@@ -24,6 +25,7 @@ contract KeeperAuction is Ownable {
         bool exist;
         address token;
         uint8 decimals;
+        uint index;
     }
 
     struct Bid {
@@ -38,9 +40,15 @@ contract KeeperAuction is Ownable {
     }
 
     struct UserBids {
+        address holder;
         bool selected;
         uint256 amount;
         uint[] bids;
+    }
+
+    struct SelectedToken {
+        address token;
+        uint256 amount;
     }
 
     event Bidded(address indexed owner, BidType bidType, uint index, address indexed token, uint256 amount);
@@ -54,13 +62,15 @@ contract KeeperAuction is Ownable {
     address[] public bidders;
     uint public deadline;
     address[] public candidates;
+    SelectedToken[] public selectedTokens;
 
     constructor(address[] memory _tokens) public {
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);
             uint8 decimals = token.decimals();
             require(decimals >= DECIMALS, "KeeperAuction::constructor: token decimal need greater default decimal");
-            tokens[_tokens[i]] = Token(true, _tokens[i], decimals);
+            tokens[_tokens[i]] = Token(true, _tokens[i], decimals, i);
+            selectedTokens.push(SelectedToken(_tokens[i], 0));
         }
     }
 
@@ -85,6 +95,7 @@ contract KeeperAuction is Ownable {
         if (userBids[msg.sender].bids.length == 0) {
             bidders.push(msg.sender);
         }
+        userBids[msg.sender].holder = msg.sender;
         userBids[msg.sender].amount = userBids[msg.sender].amount.add(vAmount);
         userBids[msg.sender].bids.push(cIndex);
         emit Bidded(msg.sender, _type, cIndex, _token, _amount);
@@ -98,6 +109,7 @@ contract KeeperAuction is Ownable {
 
         ERC20Interface token = ERC20Interface(_bid.token);
         uint256 cancelAmount = _bid.amount.sub(_bid.selectdAmount);
+        require(cancelAmount > 0, "KeeperAuction::cancel: zero amount");
         require(token.transfer(msg.sender, cancelAmount), "KeeperAuction::cancel: Transfer back fail");
         bids[_index].live = false;
         userBids[msg.sender].amount = userBids[msg.sender].amount.sub(_bid.vAmount);
@@ -220,7 +232,47 @@ contract KeeperAuction is Ownable {
         }
 
         require(position == length, "KeeperAuction::end: Insufficient seats");
-        // TODO
+        address[] memory keepers = new address[](position);
+        uint256 min = result[position - 1].amount;
+        for (uint i = 0; i < result.length; i++) {
+            keepers[i] = result[i].holder;
+            uint256 selectedAmount = 0;
+            for (uint j = 0; j < result[i].bids.length; j++) {
+                Bid memory item = bids[result[i].bids[j]];
+                if (!item.live) {
+                    continue;
+                }
+                Token memory token = tokens[item.token];
+                uint256 itemAmount = 0;
+                if (item.vAmount > min.sub(selectedAmount)) {
+                    selectedAmount = min;
+                    itemAmount = min.sub(selectedAmount);
+                } else {
+                    selectedAmount = selectedAmount.add(item.vAmount);
+                    itemAmount = item.vAmount;
+                }
+                item.selectdAmount = selectedAmount;
+                if (token.decimals > DECIMALS) {
+                    item.selectdAmount = selectedAmount.mul(10**(token.decimals - DECIMALS));
+                }
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(item.selectdAmount);
+
+                if (selectedAmount == min) {
+                    break;
+                }
+            }
+        }
+
+        address[] memory _tokens = new address[](selectedTokens.length);
+        uint256[] memory _amounts = new uint256[](selectedTokens.length);
+        for(uint i = 0; i < selectedTokens.length; i++) {
+            ERC20Interface token = ERC20Interface(selectedTokens[i].token);
+            _tokens[i] = selectedTokens[i].token;
+            _amounts[i] = selectedTokens[i].amount;
+            require(token.approve(target, selectedTokens[i].amount), "KeeperAuction::end: approve fail");
+        }
+        KeeperHolderInterface holder = KeeperHolderInterface(target);
+        require(holder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
     }
 
     function getBlockTimestamp() public view returns (uint) {
