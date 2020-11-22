@@ -22,9 +22,18 @@ contract("KeeperAuction", accounts => {
     describe('bid', () => {
         it('insufficient allowance', async () => {
             try {
-                await auction.bid(hBTC.address, etherUnsigned(1000000000000000000));
-                assert.fail();
+                await auction.bid(0, hBTC.address, etherUnsigned(1000000000000000000));
             } catch (e) {
+                expect(e.reason).equals("Insufficient allowance");
+            }
+        });
+
+        it('bid 100000000000000000 for small amount', async () => {
+            try {
+                await hBTC.approve(auction.address, etherUnsigned("100000000001234567"), {from: holder});
+                await auction.bid(0, hBTC.address, etherUnsigned("100000000001234567"), {from: holder});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::bid: too small amount");
             }
         });
         
@@ -34,9 +43,8 @@ contract("KeeperAuction", accounts => {
             let hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("0");
 
-            const result = await auction.bid(0, hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
+            await auction.bid(0, hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
 
-            expect(result.logs[0].args.power.toString()).equals("1000000000");
             hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("1000000000001234567");
         });
