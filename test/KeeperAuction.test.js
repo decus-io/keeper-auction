@@ -343,7 +343,7 @@ contract("KeeperAuction", accounts => {
     });
 
     describe('end', () => {
-        it('check is not selected', async () => {
+        it('check one selected', async () => {
             await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
             await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
             await wBTC.transfer(keeper3, etherUnsigned("1000000000"), {from: holder});
@@ -421,6 +421,75 @@ contract("KeeperAuction", accounts => {
             keeper1Balance = await wBTC.balanceOf(keeper1);
             expect(keeper1Balance.toString()).equals("1000000000");
             keeper2Balance = await wBTC.balanceOf(keeper2);
+            expect(keeper2Balance.toString()).equals("800000000");
+        });
+
+
+        it('check two selected', async () => {
+            await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper3, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(unbid, etherUnsigned("1000000000"), {from: holder});
+
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper1});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
+
+            await hBTC.transfer(keeper1, etherUnsigned("1000000000000000000"), {from: holder});
+            await hBTC.transfer(keeper2, etherUnsigned("1000000000000000000"), {from: holder});
+            await hBTC.transfer(keeper3, etherUnsigned("1000000000000000000"), {from: holder});
+            await hBTC.transfer(unbid, etherUnsigned("1000000000000000000"), {from: holder});
+
+            await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper1});
+            await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper2});
+            await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper3});
+
+            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper3});
+            await auction.bid(0, hBTC.address, etherUnsigned("700000000000000000"), {from: keeper3});
+
+            let biddable = await auction.biddable();
+            expect(biddable).equals(true);
+
+            const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
+            const deadline = blockTimestamp.plus(20);
+
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline);
+
+            const keeper1Bids = await auction.userBids(keeper1);
+            expect(keeper1Bids.amount.toString()).equals("50000000");
+            const keeper2Bids = await auction.userBids(keeper2);
+            expect(keeper2Bids.amount.toString()).equals("200000000");
+            const keeper3Bids = await auction.userBids(keeper3);
+            expect(keeper3Bids.amount.toString()).equals("220000000");
+
+            await timeout(20000);
+
+            const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+
+            let wBTCBalance = await wBTC.balanceOf(auction.address);
+            expect(wBTCBalance.toString()).equals("400000000");
+
+            let hBTCBalance = await hBTC.balanceOf(auction.address);
+            expect(hBTCBalance.toString()).equals("700000000000000000");
+
+            await auction.end(keeperHolder.address, 2, {from: owner});
+
+            wBTCBalance = await wBTC.balanceOf(auction.address);
+            expect(wBTCBalance.toString()).equals("300000000");
+            hBTCBalance = await hBTC.balanceOf(auction.address);
+            expect(hBTCBalance.toString()).equals("700000000000000000");
+
+            wBTCBalance = await wBTC.balanceOf(keeperHolder.address);
+            expect(wBTCBalance.toString()).equals("100000000");
+            hBTCBalance = await hBTC.balanceOf(keeperHolder.address);
+            expect(hBTCBalance.toString()).equals("0");
+
+            let keeper1Balance = await wBTC.balanceOf(keeper1);
+            expect(keeper1Balance.toString()).equals("950000000");
+            let keeper2Balance = await wBTC.balanceOf(keeper2);
             expect(keeper2Balance.toString()).equals("800000000");
         });
     });

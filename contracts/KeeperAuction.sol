@@ -226,27 +226,22 @@ contract KeeperAuction is Ownable {
                 continue;
             }
 
-            bool needSort = false;
             UserBids memory item = userBids[candidates[i]];
             if (length < position) {
-                needSort = true;
                 result[length] = item;
                 length++;
             } else {
                 if (result[length - 1].amount < item.amount) {
-                    needSort = true;
                     result[length - 1] = item;
                 }
             }
-            if (needSort) {
-                for (uint k = length - 1; k > 0; k--) {
-                    if (result[k - 1].amount < result[k].amount) {
-                        UserBids memory temp = result[k];
-                        result[k] = result[k - 1];
-                        result[k - 1] = temp;
-                    } else {
-                        break;
-                    }
+            for (uint k = length - 1; k > 0; k--) {
+                if (result[k - 1].amount < result[k].amount) {
+                    UserBids memory temp = result[k];
+                    result[k] = result[k - 1];
+                    result[k - 1] = temp;
+                } else {
+                    break;
                 }
             }
         }
@@ -259,18 +254,17 @@ contract KeeperAuction is Ownable {
             keepers[i] = result[i].holder;
             uint256 selectedAmount = 0;
             for (uint j = 0; j < result[i].bids.length; j++) {
-                Bid memory item = bids[result[i].bids[j]];
-                if (!item.live) {
+                if (!bids[result[i].bids[j]].live) {
                     continue;
                 }
-                Token memory token = tokens[item.token];
+                Token memory token = tokens[bids[result[i].bids[j]].token];
                 uint256 itemAmount = 0;
-                if (item.vAmount > min.sub(selectedAmount)) {
-                    selectedAmount = min;
+                if (bids[result[i].bids[j]].vAmount > min.sub(selectedAmount)) {
                     itemAmount = min.sub(selectedAmount);
+                    selectedAmount = min;
                 } else {
-                    selectedAmount = selectedAmount.add(item.vAmount);
-                    itemAmount = item.vAmount;
+                    selectedAmount = selectedAmount.add(bids[result[i].bids[j]].vAmount);
+                    itemAmount = bids[result[i].bids[j]].vAmount;
                 }
                 bids[result[i].bids[j]].selectdAmount = itemAmount;
                 if (token.decimals > DECIMALS) {
