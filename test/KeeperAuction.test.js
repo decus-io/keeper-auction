@@ -397,6 +397,31 @@ contract("KeeperAuction", accounts => {
 
             wBTCBalance = await wBTC.balanceOf(keeperHolder.address);
             expect(wBTCBalance.toString()).equals("200000000");
+
+            let keeper1Balance = await wBTC.balanceOf(keeper1);
+            expect(keeper1Balance.toString()).equals("900000000");
+            let keeper2Balance = await wBTC.balanceOf(keeper2);
+            expect(keeper2Balance.toString()).equals("800000000");
+
+            try {
+                await auction.cancel(1, {from: keeper2});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::cancel: zero amount");
+            }
+
+            try {
+                await auction.cancel(2, {from: keeper2});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::cancel: zero amount");
+            }
+
+            await auction.refund({from: keeper2});
+            await auction.refund({from: keeper1});
+
+            keeper1Balance = await wBTC.balanceOf(keeper1);
+            expect(keeper1Balance.toString()).equals("1000000000");
+            keeper2Balance = await wBTC.balanceOf(keeper2);
+            expect(keeper2Balance.toString()).equals("800000000");
         });
     });
 });
