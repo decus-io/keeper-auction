@@ -192,4 +192,8 @@ contract("KeeperAuction", accounts => {
             expect(keep2Balance.toString()).equals("200000000");
         });
     });
+
+    describe('all', async () => {
+        expect("0").equals("0");
+    });
 });
