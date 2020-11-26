@@ -14,17 +14,17 @@ interface ERC20 {
 contract KeeperHolderHarness {
     address[] public keepers;
 
-    function add(address[] _tokens, uint256[] _amount, address[] _keepers) public returns (bool) {
+    function add(address[] memory _tokens, uint256[] memory _amount, address[] memory _keepers) public returns (bool) {
         require(_tokens.length == _amount.length, "KeeperHolderHarness:add: dismatch tokens and amount");
         for(uint i = 0; i < _tokens.length; i++) {
-            ERC20 token = ERC20Interface(_tokens[i]);
+            ERC20 token = ERC20(_tokens[i]);
             require(token.transferFrom(msg.sender, address(this), _amount[i]), "KeeperHolderHarness:add: transferFrom fail");
         }
         keepers = _keepers;
         return true;
     }
 
-    function keeperSize() public returns (uint) {
+    function keeperSize() public view returns (uint) {
         return keepers.length;
     }
 }

@@ -65,7 +65,7 @@ contract KeeperAuction is Ownable {
     uint public constant MAXIMUM_DELAY = 5 days;
 
     constructor(address[] memory _tokens, uint _delay) public {
-        require(_delay > 100 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
+        require(_delay > 0 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
         MINIMUM_DELAY = _delay;
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);
@@ -107,7 +107,7 @@ contract KeeperAuction is Ownable {
         require(bids.length > _index, "KeeperAuction::cancel: Unknow bid index");
         Bid memory _bid = bids[_index];
         require(_bid.live, "KeeperAuction::cancel: Bid already canceled");
-        require(msg.sender == _bid.owner, "KeeperAuction::cancel: Bid owner canceled");
+        require(msg.sender == _bid.owner, "KeeperAuction::cancel: Only owner can cancel");
 
         ERC20Interface token = ERC20Interface(_bid.token);
         uint256 cancelAmount = _bid.amount.sub(_bid.selectdAmount);
@@ -191,6 +191,10 @@ contract KeeperAuction is Ownable {
 
     function bidderCount() public view returns (uint) {
         return bidders.length;
+    }
+
+    function bidCount() public view returns (uint) {
+        return bids.length;
     }
 
     function biddable() public view returns (bool) {
