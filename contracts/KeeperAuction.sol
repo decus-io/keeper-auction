@@ -59,6 +59,7 @@ contract KeeperAuction is Ownable {
     uint public deadline;
     address[] public candidates;
     SelectedToken[] public selectedTokens;
+    bool public ended;
 
     // timelock
     uint public MINIMUM_DELAY;
@@ -67,6 +68,7 @@ contract KeeperAuction is Ownable {
     constructor(address[] memory _tokens, uint _delay) public {
         require(_delay > 0 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
         MINIMUM_DELAY = _delay;
+        ended = false;
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);
             uint8 decimals = token.decimals();
@@ -212,8 +214,9 @@ contract KeeperAuction is Ownable {
     }
 
     function end(address target, uint position) public onlyOwner {
+        require(!ended, "KeeperAuction::end: already ended");
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
-        require(position >= candidates.length, "KeeperAuction::end: position to large");
+        require(position <= candidates.length, "KeeperAuction::end: position to large");
 
         UserBids[] memory result = new UserBids[](position);
         uint length = 0;
@@ -223,20 +226,27 @@ contract KeeperAuction is Ownable {
                 continue;
             }
 
+            bool needSort = false;
             UserBids memory item = userBids[candidates[i]];
             if (length < position) {
+                needSort = true;
                 result[length] = item;
                 length++;
             } else {
-                result[length - 1] = item;
+                if (result[length - 1].amount < item.amount) {
+                    needSort = true;
+                    result[length - 1] = item;
+                }
             }
-            for (uint k = length - 1; k > 0; k--) {
-                if (result[k - 1].amount < result[k].amount) {
-                    UserBids memory temp = result[k];
-                    result[k] = result[k - 1];
-                    result[k - 1] = temp;
-                } else {
-                    break;
+            if (needSort) {
+                for (uint k = length - 1; k > 0; k--) {
+                    if (result[k - 1].amount < result[k].amount) {
+                        UserBids memory temp = result[k];
+                        result[k] = result[k - 1];
+                        result[k - 1] = temp;
+                    } else {
+                        break;
+                    }
                 }
             }
         }
@@ -244,6 +254,7 @@ contract KeeperAuction is Ownable {
         require(position == length, "KeeperAuction::end: Insufficient seats");
         address[] memory keepers = new address[](position);
         uint256 min = result[position - 1].amount;
+
         for (uint i = 0; i < result.length; i++) {
             keepers[i] = result[i].holder;
             uint256 selectedAmount = 0;
@@ -261,9 +272,9 @@ contract KeeperAuction is Ownable {
                     selectedAmount = selectedAmount.add(item.vAmount);
                     itemAmount = item.vAmount;
                 }
-                bids[result[i].bids[j]].selectdAmount = selectedAmount;
+                bids[result[i].bids[j]].selectdAmount = itemAmount;
                 if (token.decimals > DECIMALS) {
-                    bids[result[i].bids[j]].selectdAmount = selectedAmount.mul(10**(token.decimals - DECIMALS));
+                    bids[result[i].bids[j]].selectdAmount = itemAmount.mul(10**(token.decimals - DECIMALS));
                 }
                 selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[result[i].bids[j]].selectdAmount);
 
@@ -283,6 +294,7 @@ contract KeeperAuction is Ownable {
         }
         KeeperHolderInterface holder = KeeperHolderInterface(target);
         require(holder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
+        ended = true;
         emit AuctionEnd(_tokens, _amounts, keepers);
     }
 

@@ -17,6 +17,9 @@ contract KeeperHolderHarness {
     function add(address[] memory _tokens, uint256[] memory _amount, address[] memory _keepers) public returns (bool) {
         require(_tokens.length == _amount.length, "KeeperHolderHarness:add: dismatch tokens and amount");
         for(uint i = 0; i < _tokens.length; i++) {
+            if (_amount[i] == 0) {
+                continue;
+            }
             ERC20 token = ERC20(_tokens[i]);
             require(token.transferFrom(msg.sender, address(this), _amount[i]), "KeeperHolderHarness:add: transferFrom fail");
         }
