@@ -17,10 +17,6 @@ contract KeeperAuction is Ownable {
     uint public constant POWER_MONTH_12 = 20;
     uint256 public constant MIN_AMOUNT = 50000000;
 
-    // timelock
-    uint public constant MINIMUM_DELAY = 1 days;
-    uint public constant MAXIMUM_DELAY = 5 days;
-
     struct Token {
         bool exist;
         address token;
@@ -64,7 +60,13 @@ contract KeeperAuction is Ownable {
     address[] public candidates;
     SelectedToken[] public selectedTokens;
 
-    constructor(address[] memory _tokens) public {
+    // timelock
+    uint public MINIMUM_DELAY;
+    uint public constant MAXIMUM_DELAY = 5 days;
+
+    constructor(address[] memory _tokens, uint _delay) public {
+        require(_delay > 100 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
+        MINIMUM_DELAY = _delay;
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);
             uint8 decimals = token.decimals();
