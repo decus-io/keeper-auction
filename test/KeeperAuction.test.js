@@ -82,7 +82,7 @@ contract("KeeperAuction", accounts => {
     });
 
     describe('cancel', () => {
-        it('cancel', async () => {
+        it('cancel one', async () => {
             await wBTC.transfer(keeper1, etherUnsigned("100000000"), {from: holder});
             await wBTC.transfer(keeper2, etherUnsigned("200000000"), {from: holder});
 
@@ -133,6 +133,24 @@ contract("KeeperAuction", accounts => {
             bid0 = await auction.getBid(0);
             expect(bid0.owner).equals(keeper1);
             expect(bid0.live).equals(false);
+        });
+
+        it('cancel and refund', async () => {
+            await wBTC.transfer(keeper1, etherUnsigned("100000000"), {from: holder});
+            await wBTC.transfer(keeper2, etherUnsigned("200000000"), {from: holder});
+
+            await wBTC.approve(auction.address, etherUnsigned("100000000"), {from: keeper1});
+            await wBTC.approve(auction.address, etherUnsigned("200000000"), {from: keeper2});
+
+            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+
+            let keep1Balance = await wBTC.balanceOf(keeper1);
+            expect(keep1Balance.toString()).equals("0");
+            let keep2Balance = await wBTC.balanceOf(keeper2);
+            expect(keep2Balance.toString()).equals("0");
         });
     });
 });
