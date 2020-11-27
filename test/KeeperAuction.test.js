@@ -6,7 +6,7 @@ const {
     timeout
 } = require('./utils/Time');
 
-const StandardToken = artifacts.require("StandardToken");
+const ERC20Mock = artifacts.require("ERC20Mock");
 const KeeperHolderHarness = artifacts.require("KeeperHolderHarness");
 const KeeperAuction = artifacts.require("KeeperAuction");
 
@@ -23,8 +23,8 @@ contract("KeeperAuction", accounts => {
 
     beforeEach(async () => {
         [owner, holder, unbid, keeper1, keeper2, keeper3] = accounts;
-        hBTC = await StandardToken.new(etherUnsigned(100000000000000000000), 'Huobi Bitcoin', 18, 'HBTC', {from: holder});
-        wBTC = await StandardToken.new(10000000000, 'Wrapped Bitcoin', 8, 'HBTC', {from: holder});
+        hBTC = await ERC20Mock.new('Huobi Bitcoin', 'HBTC', 18, etherUnsigned(100000000000000000000),  {from: holder});
+        wBTC = await ERC20Mock.new('Wrapped Bitcoin', 'WBTC', 8, 10000000000,  {from: holder});
         auction = await KeeperAuction.new([hBTC.address, wBTC.address], 10, {from: owner});
     });
 
@@ -33,7 +33,7 @@ contract("KeeperAuction", accounts => {
             try {
                 await auction.bid(0, hBTC.address, etherUnsigned(1000000000000000000));
             } catch (e) {
-                expect(e.reason).equals("Insufficient allowance");
+                expect(e.reason).equals("ERC20: transfer amount exceeds balance");
             }
         });
 

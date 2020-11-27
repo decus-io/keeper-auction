@@ -1,9 +1,11 @@
-pragma solidity ^0.5.16;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.6.12;
 
-import "./utils/SafeMath.sol";
-import "./utils/Ownable.sol";
-import "./ERC20Interface.sol";
-import "./KeeperHolderInterface.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+
+import "./interfaces/ERC20Interface.sol";
+import "./interfaces/KeeperHolderInterface.sol";
 
 contract KeeperAuction is Ownable {
     using SafeMath for uint256;
