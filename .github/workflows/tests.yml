@@ -15,10 +15,11 @@ jobs:
     steps:
       - uses: actions/setup-node@v2.1.2
 
-      - name: Install Dependencies
-        run: |
-          npm install -g truffle
-          npm install
+      - name: Install truffle
+        run: npm install -g truffle
 
-      - name: Run Tests
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
         run: truffle test
