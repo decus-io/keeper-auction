@@ -13,13 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/setup-node@v2.1.2
-
-      - name: Install truffle
-        run: npm install -g truffle
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '12'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install -g truffle
+          npm install
 
       - name: Run tests
         run: truffle test
