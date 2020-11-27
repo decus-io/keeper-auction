@@ -1,4 +1,4 @@
-name: tests
+name: All tests
 
 on:
   push:
@@ -15,9 +15,10 @@ jobs:
     steps:
       - uses: actions/setup-node@v2.1.2
 
-      - name: Install truffle
-        run: npm install -g truffle
-
-      - name: Run tests
+      - name: Install Dependencies
         run: |
-          truffle test
+          npm install -g truffle
+          npm install
+
+      - name: Run Tests
+        run: truffle test
