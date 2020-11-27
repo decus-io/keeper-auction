@@ -216,6 +216,7 @@ contract KeeperAuction is Ownable {
     function end(address target, uint position) public onlyOwner {
         require(!ended, "KeeperAuction::end: already ended");
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
+        require(position > 0, "KeeperAuction::end: at least one position");
         require(position <= candidates.length, "KeeperAuction::end: position to large");
 
         UserBids[] memory result = new UserBids[](position);

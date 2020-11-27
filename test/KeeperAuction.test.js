@@ -343,6 +343,35 @@ contract("KeeperAuction", accounts => {
     });
 
     describe('end', () => {
+        it('check end before select candidates', async () => {
+            let biddable = await auction.biddable();
+            expect(biddable).equals(true);
+
+            const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+            try {
+                await auction.end(keeperHolder.address, 1, {from: owner});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::end: position to large");
+            }
+        });
+
+        it('check timelock', async () => {
+            let biddable = await auction.biddable();
+            expect(biddable).equals(true);
+
+            const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
+            const deadline = blockTimestamp.plus(3600);
+
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
+
+            const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+            try {
+                await auction.end(keeperHolder.address, 1, {from: owner});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::end: can't end before deadline");
+            }
+        });
+
         it('check one selected', async () => {
             await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
             await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
