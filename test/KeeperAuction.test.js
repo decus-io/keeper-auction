@@ -31,7 +31,7 @@ contract("KeeperAuction", accounts => {
     describe('bid', () => {
         it('insufficient allowance', async () => {
             try {
-                await auction.bid(0, hBTC.address, etherUnsigned(1000000000000000000));
+                await auction.bid(hBTC.address, etherUnsigned(1000000000000000000));
             } catch (e) {
                 expect(e.reason).equals("ERC20: transfer amount exceeds balance");
             }
@@ -40,7 +40,7 @@ contract("KeeperAuction", accounts => {
         it('bid 100000000000000000 for small amount', async () => {
             try {
                 await hBTC.approve(auction.address, etherUnsigned("100000000001234567"), {from: holder});
-                await auction.bid(0, hBTC.address, etherUnsigned("100000000001234567"), {from: holder});
+                await auction.bid(hBTC.address, etherUnsigned("100000000001234567"), {from: holder});
             } catch (e) {
                 expect(e.reason).equals("KeeperAuction::bid: too small amount");
             }
@@ -52,30 +52,25 @@ contract("KeeperAuction", accounts => {
             let hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("0");
 
-            await auction.bid(0, hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
+            await auction.bid(hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
 
             hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("1000000000001234567");
         });
 
         it('bid multipul', async () => {
-            let power = await auction.bidderPower(holder);
-            expect(power.toString()).equals("0");
-
             await hBTC.approve(auction.address, etherUnsigned("4000000000000000000"), {from: holder});
             await wBTC.approve(auction.address, etherUnsigned("200000000"), {from: holder});
 
             let hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("0");
 
-            await auction.bid(0, hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
-            await auction.bid(1, hBTC.address, etherUnsigned("1000000000000000000"), {from: holder});
-            await auction.bid(2, hBTC.address, etherUnsigned("1000000000000000000"), {from: holder});
-            await auction.bid(2, wBTC.address, etherUnsigned("200000000"), {from: holder});
+            await auction.bid(hBTC.address, etherUnsigned("1000000000001234567"), {from: holder});
+            await auction.bid(hBTC.address, etherUnsigned("1000000000000000000"), {from: holder});
+            await auction.bid(hBTC.address, etherUnsigned("1000000000000000000"), {from: holder});
+            await auction.bid(wBTC.address, etherUnsigned("200000000"), {from: holder});
 
             hBTCBalance = await hBTC.balanceOf(auction.address);
-            power = await auction.bidderPower(holder);
-            expect(power.toString()).equals("8500000000");
             expect(hBTCBalance.toString()).equals("3000000000001234567");
 
             const wBTCBalance = await wBTC.balanceOf(auction.address);
@@ -100,13 +95,10 @@ contract("KeeperAuction", accounts => {
             let wBTCBalance = await wBTC.balanceOf(auction.address);
             expect(wBTCBalance.toString()).equals("0");
 
-            await auction.bid(0, wBTC.address, etherUnsigned("100000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("100000000"), {from: keeper1});
 
             keep1Balance = await wBTC.balanceOf(keeper1);
             expect(keep1Balance.toString()).equals("0");
-            
-            let keeper1Power = await auction.bidderPower(keeper1);
-            expect(keeper1Power.toString()).equals("1000000000");
 
             wBTCBalance = await wBTC.balanceOf(auction.address);
             expect(wBTCBalance.toString()).equals("100000000");
@@ -130,9 +122,6 @@ contract("KeeperAuction", accounts => {
 
             await auction.cancel(0, {from: keeper1});
 
-            keeper1Power = await auction.bidderPower(keeper1);
-            expect(keeper1Power.toString()).equals("0");
-
             keep1Balance = await wBTC.balanceOf(keeper1);
             expect(keep1Balance.toString()).equals("100000000");
             bid0 = await auction.getBid(0);
@@ -147,10 +136,10 @@ contract("KeeperAuction", accounts => {
             await wBTC.approve(auction.address, etherUnsigned("100000000"), {from: keeper1});
             await wBTC.approve(auction.address, etherUnsigned("200000000"), {from: keeper2});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
 
             let keep1Balance = await wBTC.balanceOf(keeper1);
             expect(keep1Balance.toString()).equals("0");
@@ -162,9 +151,6 @@ contract("KeeperAuction", accounts => {
 
             let wBTCBalance = await wBTC.balanceOf(auction.address);
             expect(wBTCBalance.toString()).equals("300000000");
-
-            let keeper1Power = await auction.bidderPower(keeper1);
-            expect(keeper1Power.toString()).equals("1000000000");
 
             await auction.cancel(0, {from: keeper1});
 
@@ -182,16 +168,10 @@ contract("KeeperAuction", accounts => {
             keep1Balance = await wBTC.balanceOf(keeper1);
             expect(keep1Balance.toString()).equals("100000000");
 
-            keeper1Power = await auction.bidderPower(keeper1);
-            expect(keeper1Power.toString()).equals("0");
-
             await auction.refund({from: keeper2});
 
             wBTCBalance = await wBTC.balanceOf(auction.address);
             expect(wBTCBalance.toString()).equals("0");
-
-            keeper2Power = await auction.bidderPower(keeper2);
-            expect(keeper2Power.toString()).equals("0");
 
             keep2Balance = await wBTC.balanceOf(keeper2);
             expect(keep2Balance.toString()).equals("200000000");
@@ -245,10 +225,10 @@ contract("KeeperAuction", accounts => {
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
@@ -259,7 +239,7 @@ contract("KeeperAuction", accounts => {
             await auction.selectCandidates([keeper1, keeper2, unbid], deadline);
 
             try {
-                await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: unbid});
+                await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: unbid});
             } catch (e) {
                 expect(e.reason).equals("KeeperAuction::bid: stop bid");
             }
@@ -275,10 +255,10 @@ contract("KeeperAuction", accounts => {
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
@@ -309,10 +289,10 @@ contract("KeeperAuction", accounts => {
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
             await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
@@ -391,11 +371,11 @@ contract("KeeperAuction", accounts => {
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper2});
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, hBTC.address, etherUnsigned("700000000000000000"), {from: keeper3});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(hBTC.address, etherUnsigned("700000000000000000"), {from: keeper3});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
@@ -472,11 +452,11 @@ contract("KeeperAuction", accounts => {
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper2});
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper3});
-            await auction.bid(0, hBTC.address, etherUnsigned("700000000000000000"), {from: keeper3});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper3});
+            await auction.bid(hBTC.address, etherUnsigned("700000000000000000"), {from: keeper3});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
@@ -540,12 +520,12 @@ contract("KeeperAuction", accounts => {
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper2});
             await hBTC.approve(auction.address, etherUnsigned("1000000000000000000"), {from: keeper3});
 
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(0, hBTC.address, etherUnsigned("2500000000000123456"), {from: keeper1});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(0, wBTC.address, etherUnsigned("150000000"), {from: keeper3});
-            await auction.bid(0, hBTC.address, etherUnsigned("700033000000000000"), {from: keeper3});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(hBTC.address, etherUnsigned("2500000000000123456"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper3});
+            await auction.bid(hBTC.address, etherUnsigned("700033000000000000"), {from: keeper3});
 
             let biddable = await auction.biddable();
             expect(biddable).equals(true);
