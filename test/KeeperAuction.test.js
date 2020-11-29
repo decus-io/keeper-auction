@@ -1,4 +1,5 @@
 const {
+    mineBlock,
     etherUnsigned
 } = require('./utils/Ethereum');
 
@@ -211,38 +212,11 @@ contract("KeeperAuction", accounts => {
 
             await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
 
+            await timeout(21000);
+            await mineBlock();
+
             biddable = await auction.biddable();
             expect(biddable).equals(false);
-        });
-
-        it('select candidates and check can\'t bid', async () => {
-            await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
-            await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
-            await wBTC.transfer(keeper3, etherUnsigned("1000000000"), {from: holder});
-            await wBTC.transfer(unbid, etherUnsigned("1000000000"), {from: holder});
-
-            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper1});
-            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
-            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
-
-            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
-            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
-            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
-
-            let biddable = await auction.biddable();
-            expect(biddable).equals(true);
-
-            const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
-            const deadline = blockTimestamp.plus(20);
-
-            await auction.selectCandidates([keeper1, keeper2, unbid], deadline);
-
-            try {
-                await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: unbid});
-            } catch (e) {
-                expect(e.reason).equals("KeeperAuction::bid: stop bid");
-            }
         });
 
         it('check cancel after select candidates before end', async () => {
@@ -344,7 +318,8 @@ contract("KeeperAuction", accounts => {
             expect(bid0.owner).equals(keeper1);
             expect(bid0.live).equals(true);
 
-            await timeout(20000);
+            await timeout(21000);
+            await mineBlock();
 
             const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
             await auction.end(keeperHolder.address, 1, {from: owner});
@@ -379,7 +354,8 @@ contract("KeeperAuction", accounts => {
 
             await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
 
-            await timeout(20000);
+            await timeout(21000);
+            await mineBlock();
 
             const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
             await auction.end(keeperHolder.address, 1, {from: owner});
@@ -413,7 +389,7 @@ contract("KeeperAuction", accounts => {
             try {
                 await auction.end(keeperHolder.address, 1, {from: owner});
             } catch (e) {
-                expect(e.reason).equals("KeeperAuction::end: position to large");
+                expect(e.reason).equals("KeeperAuction::end: can't end before deadline");
             }
         });
 
@@ -474,7 +450,8 @@ contract("KeeperAuction", accounts => {
             const keeper3Bids = await auction.userBids(keeper3);
             expect(keeper3Bids.amount.toString()).equals("70000000");
 
-            await timeout(20000);
+            await timeout(21000);
+            await mineBlock();
 
             const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
 
@@ -555,7 +532,8 @@ contract("KeeperAuction", accounts => {
             const keeper3Bids = await auction.userBids(keeper3);
             expect(keeper3Bids.amount.toString()).equals("220000000");
 
-            await timeout(20000);
+            await timeout(21000);
+            await mineBlock();
 
             const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
 
@@ -624,7 +602,8 @@ contract("KeeperAuction", accounts => {
             const keeper3Bids = await auction.userBids(keeper3);
             expect(keeper3Bids.amount.toString()).equals("220003300");
 
-            await timeout(20000);
+            await timeout(21000);
+            await mineBlock();
 
             const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
 

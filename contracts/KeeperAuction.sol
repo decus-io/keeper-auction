@@ -12,9 +12,6 @@ contract KeeperAuction is Ownable {
     using SafeMath for uint;
 
     uint public constant DECIMALS = 8;
-    uint public constant POWER_MONTH_3 = 10;
-    uint public constant POWER_MONTH_6 = 15;
-    uint public constant POWER_MONTH_12 = 20;
     uint256 public constant MIN_AMOUNT = 50000000;
 
     struct Token {
@@ -66,6 +63,7 @@ contract KeeperAuction is Ownable {
 
     constructor(address[] memory _tokens, uint _delay) public {
         require(_delay > 0 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
+        deadline = 9999999999;
         MINIMUM_DELAY = _delay;
         ended = false;
         for (uint8 i = 0; i < _tokens.length; i++) {
@@ -78,7 +76,7 @@ contract KeeperAuction is Ownable {
     }
 
     function bid(address _token, uint256 _amount) public {
-        require(candidates.length == 0, "KeeperAuction::bid: stop bid");
+        require(biddable(), "KeeperAuction::bid: stop bid");
 
         Token memory vToken = tokens[_token];
         require(vToken.exist, "KeeperAuction::bid: Unknow token");
@@ -172,11 +170,11 @@ contract KeeperAuction is Ownable {
     }
 
     function biddable() public view returns (bool) {
-        return deadline == 0;
+        return deadline > block.timestamp;
     }
 
     function withdrawable() public view returns (bool) {
-        return deadline == 0 || (deadline < block.timestamp && !ended) || ended;
+        return (deadline > block.timestamp && !ended) || (deadline < block.timestamp && ended);
     }
 
     // Owner oprations
