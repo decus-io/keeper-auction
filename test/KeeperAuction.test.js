@@ -245,6 +245,78 @@ contract("KeeperAuction", accounts => {
             }
         });
 
+        it('check cancel after select candidates before end', async () => {
+            await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper3, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(unbid, etherUnsigned("1000000000"), {from: holder});
+
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper1});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
+
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+
+            let biddable = await auction.biddable();
+            expect(biddable).equals(true);
+
+            const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
+            const deadline = blockTimestamp.plus(200);
+
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
+
+            let bid0 = await auction.getBid(0);
+            expect(bid0.owner).equals(keeper1);
+            expect(bid0.live).equals(true);
+
+            try {
+                await auction.cancel(0, {from: keeper1});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::cancel: can't cancel before end");
+            }
+        });
+
+        it('check refund after select candidates before end', async () => {
+            await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(keeper3, etherUnsigned("1000000000"), {from: holder});
+            await wBTC.transfer(unbid, etherUnsigned("1000000000"), {from: holder});
+
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper1});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper2});
+            await wBTC.approve(auction.address, etherUnsigned("1000000000"), {from: keeper3});
+
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+            await auction.bid(wBTC.address, etherUnsigned("150000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper2});
+            await auction.bid(wBTC.address, etherUnsigned("50000000"), {from: keeper1});
+
+            let biddable = await auction.biddable();
+            expect(biddable).equals(true);
+
+            const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
+            const deadline = blockTimestamp.plus(200);
+
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
+
+            let keep1Balance = await wBTC.balanceOf(keeper1);
+            expect(keep1Balance.toString()).equals("900000000");
+
+            let bid0 = await auction.getBid(0);
+            expect(bid0.live).equals(true);
+            let bid3 = await auction.getBid(3);
+            expect(bid3.live).equals(true);
+
+            try {
+                await auction.refund({from: keeper1});
+            } catch (e) {
+                expect(e.reason).equals("KeeperAuction::cancel: can't cancel before end");
+            }
+        });
+
         it('check cancel after select candidates', async () => {
             await wBTC.transfer(keeper1, etherUnsigned("1000000000"), {from: holder});
             await wBTC.transfer(keeper2, etherUnsigned("1000000000"), {from: holder});
@@ -266,11 +338,16 @@ contract("KeeperAuction", accounts => {
             const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
             const deadline = blockTimestamp.plus(20);
 
-            await auction.selectCandidates([keeper1, keeper2, unbid], deadline);
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
 
             let bid0 = await auction.getBid(0);
             expect(bid0.owner).equals(keeper1);
             expect(bid0.live).equals(true);
+
+            await timeout(20000);
+
+            const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+            await auction.end(keeperHolder.address, 1, {from: owner});
 
             await auction.cancel(0, {from: keeper1});
 
@@ -298,9 +375,14 @@ contract("KeeperAuction", accounts => {
             expect(biddable).equals(true);
 
             const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
-            const deadline = blockTimestamp.plus(100);
+            const deadline = blockTimestamp.plus(20);
 
-            await auction.selectCandidates([keeper1, keeper2, unbid], deadline);
+            await auction.selectCandidates([keeper1, keeper2, unbid], deadline, {from: owner});
+
+            await timeout(20000);
+
+            const keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+            await auction.end(keeperHolder.address, 1, {from: owner});
 
             let keep1Balance = await wBTC.balanceOf(keeper1);
             expect(keep1Balance.toString()).equals("900000000");
