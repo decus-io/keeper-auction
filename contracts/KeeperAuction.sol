@@ -55,6 +55,7 @@ contract KeeperAuction is Ownable {
     uint public deadline;
     address[] public candidates;
     SelectedToken[] public selectedTokens;
+    KeeperHolderInterface public keeperHolder;
     bool public ended;
 
     // timelock
@@ -178,16 +179,17 @@ contract KeeperAuction is Ownable {
     }
 
     // Owner operations
-    function selectCandidates(address[] memory _candidates, uint _deadline) public onlyOwner {
+    function selectCandidates(KeeperHolderInterface _keeperHolder, address[] memory _candidates, uint _deadline) public onlyOwner {
         require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::selectCandidates: deadline error");
         require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::selectCandidates: deadline too large");
 
+        keeperHolder = _keeperHolder;
         candidates = _candidates;
         deadline = _deadline;
         emit CandidatesSelected(_candidates, _deadline);
     }
 
-    function end(address target, uint position) public onlyOwner {
+    function end(uint position) public onlyOwner {
         require(!ended, "KeeperAuction::end: already ended");
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
         require(position > 0, "KeeperAuction::end: at least one position");
@@ -259,10 +261,9 @@ contract KeeperAuction is Ownable {
             ERC20Interface token = ERC20Interface(selectedTokens[i].token);
             _tokens[i] = selectedTokens[i].token;
             _amounts[i] = selectedTokens[i].amount;
-            require(token.approve(target, selectedTokens[i].amount), "KeeperAuction::end: approve fail");
+            require(token.approve(address(keeperHolder), selectedTokens[i].amount), "KeeperAuction::end: approve fail");
         }
-        KeeperHolderInterface holder = KeeperHolderInterface(target);
-        require(holder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
+        require(keeperHolder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
         ended = true;
         emit AuctionEnd(_tokens, _amounts, keepers);
     }
