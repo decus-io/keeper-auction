@@ -28,7 +28,7 @@ contract KeeperAuction is Ownable {
         address token;
         uint256 amount;
         uint256 vAmount;
-        uint256 selectdAmount;
+        uint256 selectedAmount;
     }
 
     struct UserBids {
@@ -45,7 +45,7 @@ contract KeeperAuction is Ownable {
     event Bidded(address indexed owner, uint index, address indexed token, uint256 amount);
     event Canceled(address indexed owner, uint index, address indexed token, uint256 amount);
     event Refund(address indexed owner, uint index, address indexed token, uint256 amount);
-    event CandidatesSeleted(address[] candidates, uint deadline);
+    event CandidatesSelected(address[] candidates, uint deadline);
     event AuctionEnd(address[] tokens, uint256[] amount, address[] keepers);
 
     mapping(address => Token) public tokens;
@@ -79,7 +79,7 @@ contract KeeperAuction is Ownable {
         require(biddable(), "KeeperAuction::bid: stop bid");
 
         Token memory vToken = tokens[_token];
-        require(vToken.exist, "KeeperAuction::bid: Unknow token");
+        require(vToken.exist, "KeeperAuction::bid: Unknown token");
 
         uint256 vAmount = _amount;
         uint decimals = vToken.decimals;
@@ -104,13 +104,13 @@ contract KeeperAuction is Ownable {
 
     function cancel(uint _index) public {
         require(withdrawable(), "KeeperAuction::cancel: can't cancel before end");
-        require(bids.length > _index, "KeeperAuction::cancel: Unknow bid index");
+        require(bids.length > _index, "KeeperAuction::cancel: Unknown bid index");
         Bid memory _bid = bids[_index];
         require(_bid.live, "KeeperAuction::cancel: Bid already canceled");
         require(msg.sender == _bid.owner, "KeeperAuction::cancel: Only owner can cancel");
 
         ERC20Interface token = ERC20Interface(_bid.token);
-        uint256 cancelAmount = _bid.amount.sub(_bid.selectdAmount);
+        uint256 cancelAmount = _bid.amount.sub(_bid.selectedAmount);
         require(cancelAmount > 0, "KeeperAuction::cancel: zero amount");
         require(token.transfer(msg.sender, cancelAmount), "KeeperAuction::cancel: Transfer back fail");
         bids[_index].live = false;
@@ -126,7 +126,7 @@ contract KeeperAuction is Ownable {
                 continue;
             }
 
-            uint256 refundAmount = _bid.amount.sub(_bid.selectdAmount);
+            uint256 refundAmount = _bid.amount.sub(_bid.selectedAmount);
             if (refundAmount == 0) {
                 continue;
             }
@@ -174,24 +174,24 @@ contract KeeperAuction is Ownable {
     }
 
     function withdrawable() public view returns (bool) {
-        return (deadline > block.timestamp && !ended) || (deadline < block.timestamp && ended);
+        return !((block.timestamp > deadline) && !ended);
     }
 
-    // Owner oprations
+    // Owner operations
     function selectCandidates(address[] memory _candidates, uint _deadline) public onlyOwner {
         require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::selectCandidates: deadline error");
         require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::selectCandidates: deadline too large");
 
         candidates = _candidates;
         deadline = _deadline;
-        emit CandidatesSeleted(_candidates, _deadline);
+        emit CandidatesSelected(_candidates, _deadline);
     }
 
     function end(address target, uint position) public onlyOwner {
         require(!ended, "KeeperAuction::end: already ended");
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
         require(position > 0, "KeeperAuction::end: at least one position");
-        require(position <= candidates.length, "KeeperAuction::end: position to large");
+        require(position <= candidates.length, "KeeperAuction::end: position too large");
 
         UserBids[] memory result = new UserBids[](position);
         uint length = 0;
@@ -241,11 +241,11 @@ contract KeeperAuction is Ownable {
                     selectedAmount = selectedAmount.add(bids[result[i].bids[j]].vAmount);
                     itemAmount = bids[result[i].bids[j]].vAmount;
                 }
-                bids[result[i].bids[j]].selectdAmount = itemAmount;
+                bids[result[i].bids[j]].selectedAmount = itemAmount;
                 if (token.decimals > DECIMALS) {
-                    bids[result[i].bids[j]].selectdAmount = itemAmount.mul(10**(token.decimals - DECIMALS));
+                    bids[result[i].bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
                 }
-                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[result[i].bids[j]].selectdAmount);
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[result[i].bids[j]].selectedAmount);
 
                 if (selectedAmount == min) {
                     break;
