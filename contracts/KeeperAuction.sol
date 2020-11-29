@@ -105,6 +105,7 @@ contract KeeperAuction is Ownable {
     }
 
     function cancel(uint _index) public {
+        require(withdrawable(), "KeeperAuction::cancel: can't cancel before end");
         require(bids.length > _index, "KeeperAuction::cancel: Unknow bid index");
         Bid memory _bid = bids[_index];
         require(_bid.live, "KeeperAuction::cancel: Bid already canceled");
@@ -120,6 +121,7 @@ contract KeeperAuction is Ownable {
     }
 
     function refund() public {
+        require(withdrawable(), "KeeperAuction::cancel: can't cancel before end");
         for (uint i = 0; i < userBids[msg.sender].bids.length; i++) {
             Bid memory _bid = bids[userBids[msg.sender].bids[i]];
             if (!_bid.live) {
@@ -170,7 +172,11 @@ contract KeeperAuction is Ownable {
     }
 
     function biddable() public view returns (bool) {
-        return candidates.length == 0;
+        return deadline == 0;
+    }
+
+    function withdrawable() public view returns (bool) {
+        return deadline == 0 || (deadline < block.timestamp && !ended) || ended;
     }
 
     // Owner oprations
