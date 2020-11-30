@@ -32,6 +32,7 @@ contract KeeperAuction is Ownable {
     }
 
     struct UserBids {
+        bool selected;
         address holder;
         uint256 amount;
         uint[] bids;
@@ -45,7 +46,7 @@ contract KeeperAuction is Ownable {
     event Bidded(address indexed owner, uint index, address indexed token, uint256 amount);
     event Canceled(address indexed owner, uint index, address indexed token, uint256 amount);
     event Refund(address indexed owner, uint index, address indexed token, uint256 amount);
-    event CandidatesSelected(address[] candidates, uint deadline);
+    event EndLocked(address keeperHolder, uint deadline);
     event AuctionEnd(address[] tokens, uint256[] amount, address[] keepers);
 
     mapping(address => Token) public tokens;
@@ -53,7 +54,6 @@ contract KeeperAuction is Ownable {
     Bid[] public bids;
     address[] public bidders;
     uint public deadline;
-    address[] public candidates;
     SelectedToken[] public selectedTokens;
     KeeperHolderInterface public keeperHolder;
     bool public ended;
@@ -97,6 +97,7 @@ contract KeeperAuction is Ownable {
         if (userBids[msg.sender].bids.length == 0) {
             bidders.push(msg.sender);
         }
+        userBids[msg.sender].selected = false;
         userBids[msg.sender].holder = msg.sender;
         userBids[msg.sender].amount = userBids[msg.sender].amount.add(vAmount);
         userBids[msg.sender].bids.push(cIndex);
@@ -179,75 +180,56 @@ contract KeeperAuction is Ownable {
     }
 
     // Owner operations
-    function selectCandidates(KeeperHolderInterface _keeperHolder, address[] memory _candidates, uint _deadline) public onlyOwner {
-        require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::selectCandidates: deadline error");
-        require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::selectCandidates: deadline too large");
+    function lockEnd(KeeperHolderInterface _keeperHolder, uint _deadline) public onlyOwner {
+        require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::lockEnd: deadline error");
+        require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::lockEnd: deadline too large");
 
         keeperHolder = _keeperHolder;
-        candidates = _candidates;
         deadline = _deadline;
-        emit CandidatesSelected(_candidates, _deadline);
+        emit EndLocked(address(_keeperHolder), _deadline);
     }
 
-    function end(uint position) public onlyOwner {
+    function end(address[] memory keepers) public onlyOwner {
         require(!ended, "KeeperAuction::end: already ended");
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
-        require(position > 0, "KeeperAuction::end: at least one position");
-        require(position <= candidates.length, "KeeperAuction::end: position too large");
+        require(keepers.length > 0, "KeeperAuction::end: at least one position");
 
-        UserBids[] memory result = new UserBids[](position);
-        uint length = 0;
-        for (uint i = 0; i < candidates.length; i++) {
-            uint256 amount = bidderAmount(candidates[i]);
-            if (amount == 0 || (length == position && result[length - 1].amount >= amount)) {
-                continue;
+        userBids[keepers[0]].selected = true;
+        uint256 min = userBids[keepers[0]].amount;
+        for (uint i = 1; i < keepers.length; i++) {
+            userBids[keepers[i]].selected = true;
+            if (userBids[keepers[i]].amount < min) {
+                min = userBids[keepers[i]].amount;
             }
+        }
+        require(min > 0, "KeeperAuction::end: min keeper amount is zero");
 
-            UserBids memory item = userBids[candidates[i]];
-            if (length < position) {
-                result[length] = item;
-                length++;
-            } else {
-                if (result[length - 1].amount < item.amount) {
-                    result[length - 1] = item;
-                }
-            }
-            for (uint k = length - 1; k > 0; k--) {
-                if (result[k - 1].amount < result[k].amount) {
-                    UserBids memory temp = result[k];
-                    result[k] = result[k - 1];
-                    result[k - 1] = temp;
-                } else {
-                    break;
-                }
+        for (uint i = 0; i < bidders.length; i++) {
+            if (userBids[bidders[i]].amount > min && !userBids[bidders[i]].selected) {
+                revert("KeeperAuction::end: error selected keepers");
             }
         }
 
-        require(position == length, "KeeperAuction::end: Insufficient seats");
-        address[] memory keepers = new address[](position);
-        uint256 min = result[position - 1].amount;
-
-        for (uint i = 0; i < result.length; i++) {
-            keepers[i] = result[i].holder;
+        for (uint i = 0; i < keepers.length; i++) {
             uint256 selectedAmount = 0;
-            for (uint j = 0; j < result[i].bids.length; j++) {
-                if (!bids[result[i].bids[j]].live) {
+            for (uint j = 0; j < userBids[keepers[i]].bids.length; j++) {
+                if (!bids[userBids[keepers[i]].bids[j]].live) {
                     continue;
                 }
-                Token memory token = tokens[bids[result[i].bids[j]].token];
+                Token memory token = tokens[bids[userBids[keepers[i]].bids[j]].token];
                 uint256 itemAmount = 0;
-                if (bids[result[i].bids[j]].vAmount > min.sub(selectedAmount)) {
+                if (bids[userBids[keepers[i]].bids[j]].vAmount > min.sub(selectedAmount)) {
                     itemAmount = min.sub(selectedAmount);
                     selectedAmount = min;
                 } else {
-                    selectedAmount = selectedAmount.add(bids[result[i].bids[j]].vAmount);
-                    itemAmount = bids[result[i].bids[j]].vAmount;
+                    selectedAmount = selectedAmount.add(bids[userBids[keepers[i]].bids[j]].vAmount);
+                    itemAmount = bids[userBids[keepers[i]].bids[j]].vAmount;
                 }
-                bids[result[i].bids[j]].selectedAmount = itemAmount;
+                bids[userBids[keepers[i]].bids[j]].selectedAmount = itemAmount;
                 if (token.decimals > DECIMALS) {
-                    bids[result[i].bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
+                    bids[userBids[keepers[i]].bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
                 }
-                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[result[i].bids[j]].selectedAmount);
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[userBids[keepers[i]].bids[j]].selectedAmount);
 
                 if (selectedAmount == min) {
                     break;
