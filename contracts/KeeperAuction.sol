@@ -33,7 +33,6 @@ contract KeeperAuction is Ownable {
 
     struct UserBids {
         bool selected;
-        address holder;
         uint256 amount;
         uint[] bids;
     }
@@ -98,7 +97,6 @@ contract KeeperAuction is Ownable {
             bidders.push(msg.sender);
         }
         userBids[msg.sender].selected = false;
-        userBids[msg.sender].holder = msg.sender;
         userBids[msg.sender].amount = userBids[msg.sender].amount.add(vAmount);
         userBids[msg.sender].bids.push(cIndex);
         emit Bidded(msg.sender, cIndex, _token, _amount);
@@ -212,24 +210,25 @@ contract KeeperAuction is Ownable {
 
         for (uint i = 0; i < keepers.length; i++) {
             uint256 selectedAmount = 0;
-            for (uint j = 0; j < userBids[keepers[i]].bids.length; j++) {
-                if (!bids[userBids[keepers[i]].bids[j]].live) {
+            UserBids storage _userBids = userBids[keepers[i]];
+            for (uint j = 0; j < _userBids.bids.length; j++) {
+                if (!bids[_userBids.bids[j]].live) {
                     continue;
                 }
-                Token memory token = tokens[bids[userBids[keepers[i]].bids[j]].token];
+                Token memory token = tokens[bids[_userBids.bids[j]].token];
                 uint256 itemAmount = 0;
-                if (bids[userBids[keepers[i]].bids[j]].vAmount > min.sub(selectedAmount)) {
+                if (bids[_userBids.bids[j]].vAmount > min.sub(selectedAmount)) {
                     itemAmount = min.sub(selectedAmount);
                     selectedAmount = min;
                 } else {
-                    selectedAmount = selectedAmount.add(bids[userBids[keepers[i]].bids[j]].vAmount);
-                    itemAmount = bids[userBids[keepers[i]].bids[j]].vAmount;
+                    selectedAmount = selectedAmount.add(bids[_userBids.bids[j]].vAmount);
+                    itemAmount = bids[_userBids.bids[j]].vAmount;
                 }
-                bids[userBids[keepers[i]].bids[j]].selectedAmount = itemAmount;
+                bids[_userBids.bids[j]].selectedAmount = itemAmount;
                 if (token.decimals > DECIMALS) {
-                    bids[userBids[keepers[i]].bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
+                    bids[_userBids.bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
                 }
-                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[userBids[keepers[i]].bids[j]].selectedAmount);
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[_userBids.bids[j]].selectedAmount);
 
                 if (selectedAmount == min) {
                     break;
