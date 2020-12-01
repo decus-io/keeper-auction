@@ -206,21 +206,25 @@ contract KeeperAuction is Ownable {
 
         uint256 min = userBids[keepers[0]].amount;
         for (uint i = 0; i < keepers.length; i++) {
-            userBids[keepers[i]].selected = true;
-            if (userBids[keepers[i]].amount < min) {
-                min = userBids[keepers[i]].amount;
+            UserBids storage _userBids = userBids[keepers[i]];
+            _userBids.selected = true;
+            if (_userBids.amount < min) {
+                min = _userBids.amount;
             }
         }
         require(min > 0, "KeeperAuction::end: min keeper amount is zero");
 
         for (uint i = 0; i < bidders.length; i++) {
-            require(userBids[bidders[i]].amount <= min || userBids[bidders[i]].selected,
+            UserBids storage _userBids = userBids[bidders[i]];
+            require(_userBids.amount <= min || _userBids.selected,
                 "KeeperAuction::end: error selected keepers");
         }
 
         for (uint i = 0; i < keepers.length; i++) {
             uint256 remainAmount = min;
-            uint[] storage _bid_indexes = userBids[keepers[i]].bids;
+            UserBids storage _userBids = userBids[keepers[i]];
+            _userBids.amount = _userBids.amount.sub(min);
+            uint[] storage _bid_indexes = _userBids.bids;
             for (uint j = 0; j < _bid_indexes.length; j++) {
                 uint _index = _bid_indexes[j];
                 Bid storage _bid = bids[_index];
@@ -232,8 +236,7 @@ contract KeeperAuction is Ownable {
                 if (_bid.vAmount >= remainAmount) {
                     itemAmount = remainAmount;
                     remainAmount = 0;
-                }
-                else {
+                } else {
                     itemAmount = _bid.vAmount;
                     remainAmount = remainAmount.sub(_bid.vAmount);
                 }
