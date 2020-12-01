@@ -135,6 +135,7 @@ contract KeeperAuction is Ownable {
             bids[_bid.index].live = false;
             emit Refund(msg.sender, _bid.index, _bid.token, refundAmount);
         }
+        userBids[msg.sender].amount = 0;
     }
 
     function getBid(uint _index) public view returns (
@@ -177,6 +178,14 @@ contract KeeperAuction is Ownable {
         return !((block.timestamp > deadline) && !ended);
     }
 
+    function cancelable(uint _index) public view returns (bool) {
+        if (!withdrawable()) {
+            return false;
+        }
+        Bid memory _bid = bids[_index];
+        return _bid.live && _bid.amount.sub(_bid.selectedAmount) > 0;
+    }
+
     // Owner operations
     function lockEnd(KeeperHolderInterface _keeperHolder, uint _deadline) public onlyOwner {
         require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::lockEnd: deadline error");
@@ -211,6 +220,7 @@ contract KeeperAuction is Ownable {
         for (uint i = 0; i < keepers.length; i++) {
             uint256 selectedAmount = 0;
             UserBids storage _userBids = userBids[keepers[i]];
+            _userBids.amount = _userBids.amount.sub(min);
             for (uint j = 0; j < _userBids.bids.length; j++) {
                 if (!bids[_userBids.bids[j]].live) {
                     continue;
