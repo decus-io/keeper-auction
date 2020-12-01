@@ -14,6 +14,6 @@ npm install
 ### Testing
 
 ```
-// ganache-cli
+ganache-cli -a 200
 truffle test
 ```

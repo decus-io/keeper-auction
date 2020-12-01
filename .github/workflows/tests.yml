@@ -16,12 +16,16 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12'
+          node-version: '11'
 
       - name: Install dependencies
         run: |
           npm install -g truffle
+          npm install -g ganache-cli
           npm install
+
+      - name: Run ganache
+        run: ganache-cli -a 200 &
 
       - name: Run tests
         run: truffle test
