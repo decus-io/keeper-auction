@@ -201,9 +201,8 @@ contract KeeperAuction is Ownable {
         require(getBlockTimestamp() >= deadline, "KeeperAuction::end: can't end before deadline");
         require(keepers.length > 0, "KeeperAuction::end: at least one position");
 
-        userBids[keepers[0]].selected = true;
         uint256 min = userBids[keepers[0]].amount;
-        for (uint i = 1; i < keepers.length; i++) {
+        for (uint i = 0; i < keepers.length; i++) {
             userBids[keepers[i]].selected = true;
             if (userBids[keepers[i]].amount < min) {
                 min = userBids[keepers[i]].amount;
@@ -212,35 +211,36 @@ contract KeeperAuction is Ownable {
         require(min > 0, "KeeperAuction::end: min keeper amount is zero");
 
         for (uint i = 0; i < bidders.length; i++) {
-            if (userBids[bidders[i]].amount > min && !userBids[bidders[i]].selected) {
-                revert("KeeperAuction::end: error selected keepers");
-            }
+            require(userBids[bidders[i]].amount <= min || userBids[bidders[i]].selected,
+                "KeeperAuction::end: error selected keepers");
         }
 
         for (uint i = 0; i < keepers.length; i++) {
-            uint256 selectedAmount = 0;
-            UserBids storage _userBids = userBids[keepers[i]];
-            _userBids.amount = _userBids.amount.sub(min);
-            for (uint j = 0; j < _userBids.bids.length; j++) {
-                if (!bids[_userBids.bids[j]].live) {
+            uint256 remainAmount = min;
+            uint[] storage _bid_indexes = userBids[keepers[i]].bids;
+            for (uint j = 0; j < _bid_indexes.length; j++) {
+                uint _index = _bid_indexes[j];
+                Bid storage _bid = bids[_index];
+                if (!_bid.live) {
                     continue;
                 }
-                Token memory token = tokens[bids[_userBids.bids[j]].token];
+                Token storage token = tokens[_bid.token];
                 uint256 itemAmount = 0;
-                if (bids[_userBids.bids[j]].vAmount > min.sub(selectedAmount)) {
-                    itemAmount = min.sub(selectedAmount);
-                    selectedAmount = min;
-                } else {
-                    selectedAmount = selectedAmount.add(bids[_userBids.bids[j]].vAmount);
-                    itemAmount = bids[_userBids.bids[j]].vAmount;
+                if (_bid.vAmount >= remainAmount) {
+                    itemAmount = remainAmount;
+                    remainAmount = 0;
                 }
-                bids[_userBids.bids[j]].selectedAmount = itemAmount;
+                else {
+                    itemAmount = _bid.vAmount;
+                    remainAmount = remainAmount.sub(_bid.vAmount);
+                }
                 if (token.decimals > DECIMALS) {
-                    bids[_userBids.bids[j]].selectedAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
+                    itemAmount = itemAmount.mul(10 ** (token.decimals - DECIMALS));
                 }
-                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(bids[_userBids.bids[j]].selectedAmount);
+                _bid.selectedAmount = itemAmount;
+                selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(itemAmount);
 
-                if (selectedAmount == min) {
+                if (remainAmount == 0) {
                     break;
                 }
             }
