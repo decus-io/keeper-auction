@@ -81,6 +81,9 @@ contract("KeeperAuction", accounts => {
 
             const bidderCount = await auction.bidderCount();
             expect(bidderCount.toString()).equals("1");
+
+            const bidderAmount = await auction.bidderAmount(holder);
+            expect(bidderAmount.toString()).equals("500000000");
         });
     });
 

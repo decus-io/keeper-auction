@@ -78,7 +78,7 @@ contract KeeperAuction is Ownable {
     function bid(address _token, uint256 _amount) public {
         require(biddable(), "KeeperAuction::bid: stop bid");
 
-        Token memory vToken = tokens[_token];
+        Token storage vToken = tokens[_token];
         require(vToken.exist, "KeeperAuction::bid: Unknown token");
 
         uint256 vAmount = _amount;
@@ -91,21 +91,22 @@ contract KeeperAuction is Ownable {
         ERC20Interface token = ERC20Interface(_token);
         require(token.transferFrom(msg.sender, address(this), _amount), "KeeperAuction::bid: transferFrom fail");
 
+        UserBids storage _userBids = userBids[msg.sender];
         uint cIndex = bids.length;
         bids.push(Bid(msg.sender, true, cIndex, _token, _amount, vAmount, 0));
-        if (userBids[msg.sender].bids.length == 0) {
+        if (_userBids.bids.length == 0) {
             bidders.push(msg.sender);
         }
-        userBids[msg.sender].selected = false;
-        userBids[msg.sender].amount = userBids[msg.sender].amount.add(vAmount);
-        userBids[msg.sender].bids.push(cIndex);
+        _userBids.selected = false;
+        _userBids.amount = _userBids.amount.add(vAmount);
+        _userBids.bids.push(cIndex);
         emit Bidded(msg.sender, cIndex, _token, _amount);
     }
 
     function cancel(uint _index) public {
         require(withdrawable(), "KeeperAuction::cancel: can't cancel before end");
         require(bids.length > _index, "KeeperAuction::cancel: Unknown bid index");
-        Bid memory _bid = bids[_index];
+        Bid storage _bid = bids[_index];
         require(_bid.live, "KeeperAuction::cancel: Bid already canceled");
         require(msg.sender == _bid.owner, "KeeperAuction::cancel: Only owner can cancel");
 
@@ -113,15 +114,17 @@ contract KeeperAuction is Ownable {
         uint256 cancelAmount = _bid.amount.sub(_bid.selectedAmount);
         require(cancelAmount > 0, "KeeperAuction::cancel: zero amount");
         require(token.transfer(msg.sender, cancelAmount), "KeeperAuction::cancel: Transfer back fail");
-        bids[_index].live = false;
-        userBids[msg.sender].amount = userBids[msg.sender].amount.sub(_bid.vAmount);
+        _bid.live = false;
+        UserBids storage _userBids = userBids[msg.sender];
+        _userBids.amount = _userBids.amount.sub(_bid.vAmount);
         emit Canceled(msg.sender, _bid.index, _bid.token, cancelAmount);
     }
 
     function refund() public {
         require(withdrawable(), "KeeperAuction::cancel: can't cancel before end");
-        for (uint i = 0; i < userBids[msg.sender].bids.length; i++) {
-            Bid memory _bid = bids[userBids[msg.sender].bids[i]];
+        uint[] storage _userBids = userBids[msg.sender].bids;
+        for (uint i = 0; i < _userBids.length; i++) {
+            Bid storage _bid = bids[_userBids[i]];
             if (!_bid.live) {
                 continue;
             }
@@ -132,7 +135,7 @@ contract KeeperAuction is Ownable {
             }
             ERC20Interface token = ERC20Interface(_bid.token);
             require(token.transfer(msg.sender, refundAmount), "KeeperAuction::refund: Transfer back fail");
-            bids[_bid.index].live = false;
+            _bid.live = false;
             emit Refund(msg.sender, _bid.index, _bid.token, refundAmount);
         }
         userBids[msg.sender].amount = 0;
@@ -144,7 +147,7 @@ contract KeeperAuction is Ownable {
         uint index,
         address token,
         uint256 amount) {
-        Bid memory _bid = bids[_index];
+        Bid storage _bid = bids[_index];
         return (
             _bid.owner,
             _bid.live,
@@ -182,7 +185,7 @@ contract KeeperAuction is Ownable {
         if (!withdrawable()) {
             return false;
         }
-        Bid memory _bid = bids[_index];
+        Bid storage _bid = bids[_index];
         return _bid.live && _bid.amount.sub(_bid.selectedAmount) > 0;
     }
 
