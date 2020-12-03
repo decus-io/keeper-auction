@@ -10,7 +10,7 @@ contract ERC20Mock is ERC20 {
         string memory symbol,
         uint8 decimals,
         uint256 initialBalance
-    ) payable ERC20(name, symbol) {
+    ) public payable ERC20(name, symbol) {
         _setupDecimals(decimals);
         _mint(msg.sender, initialBalance);
     }
