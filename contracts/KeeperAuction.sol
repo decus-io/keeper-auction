@@ -12,7 +12,6 @@ contract KeeperAuction is Ownable {
     using SafeMath for uint;
 
     uint public constant DECIMALS = 8;
-    uint256 public constant MIN_AMOUNT = 50000000;
 
     struct Token {
         bool exist;
@@ -57,14 +56,17 @@ contract KeeperAuction is Ownable {
     KeeperHolderInterface public keeperHolder;
     bool public ended;
 
+    uint256 public MIN_AMOUNT;
+
     // timelock
     uint public MINIMUM_DELAY;
     uint public constant MAXIMUM_DELAY = 5 days;
 
-    constructor(address[] memory _tokens, uint _delay) public {
+    constructor(address[] memory _tokens, uint _delay, uint256 minAmount) public {
         require(_delay > 0 && _delay < MAXIMUM_DELAY, "KeeperAuction::constructor: delay illegal");
         deadline = 9999999999;
         MINIMUM_DELAY = _delay;
+        MIN_AMOUNT = minAmount;
         ended = false;
         for (uint8 i = 0; i < _tokens.length; i++) {
             ERC20Interface token = ERC20Interface(_tokens[i]);

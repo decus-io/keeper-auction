@@ -23,7 +23,7 @@ contract("KeeperAuction", accounts => {
         [owner, holder, unbid, keeper1, keeper2, keeper3] = accounts;
         hBTC = await ERC20Mock.new('Huobi Bitcoin', 'HBTC', 18, etherUnsigned(100000000000000000000),  {from: holder});
         wBTC = await ERC20Mock.new('Wrapped Bitcoin', 'WBTC', 8, 20000000000,  {from: holder});
-        auction = await KeeperAuction.new([hBTC.address, wBTC.address], 1, {from: owner});
+        auction = await KeeperAuction.new([hBTC.address, wBTC.address], 1, 50000000, {from: owner});
         keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
     });
 
