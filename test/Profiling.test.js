@@ -8,7 +8,7 @@ const {
 } = require('./utils/Time');
 
 const ERC20Mock = artifacts.require("ERC20Mock");
-const KeeperHolderHarness = artifacts.require("KeeperHolderHarness");
+const KeeperImportHarness = artifacts.require("KeeperImportHarness");
 const KeeperAuction = artifacts.require("KeeperAuction");
 
 contract("KeeperAuction", accounts => {
@@ -21,14 +21,14 @@ contract("KeeperAuction", accounts => {
     let hBTC;
     let wBTC;
     let auction;
-    let keeperHolder;
+    let keeperImport;
 
     beforeEach(async () => {
         [owner, holder, unbid, keeper1, keeper2, keeper3] = accounts;
         hBTC = await ERC20Mock.new('Huobi Bitcoin', 'HBTC', 18, etherUnsigned(100000000000000000000),  {from: holder});
         wBTC = await ERC20Mock.new('Wrapped Bitcoin', 'WBTC', 8, 10000000000,  {from: holder});
         auction = await KeeperAuction.new([hBTC.address, wBTC.address], 1, 50000000, {from: owner});
-        keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+        keeperImport = await KeeperImportHarness.new([hBTC.address, wBTC.address]);
     });
 
     describe('end', () => {
@@ -64,7 +64,7 @@ contract("KeeperAuction", accounts => {
             const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
             const deadline = blockTimestamp.plus(2);
 
-            await auction.lockEnd(keeperHolder.address, deadline);
+            await auction.lockEnd(keeperImport.address, deadline);
 
             const keeper1Bids = await auction.userBids(keeper1);
             expect(keeper1Bids.amount.toString()).equals("300000000");
@@ -86,7 +86,6 @@ contract("KeeperAuction", accounts => {
             console.log(`Initial: ${initial.toString()}`);
 
             const receipt = await auction.end([keeper1, keeper2, keeper3], {from: owner});
-            const gasUsed = receipt.receipt.gasUsed;
             console.log(`GasUsed: ${receipt.receipt.gasUsed}`);
 
             wBTCBalance = await wBTC.balanceOf(auction.address);
@@ -94,9 +93,9 @@ contract("KeeperAuction", accounts => {
             hBTCBalance = await hBTC.balanceOf(auction.address);
             expect(hBTCBalance.toString()).equals("1200033000000123456");
 
-            wBTCBalance = await wBTC.balanceOf(keeperHolder.address);
+            wBTCBalance = await wBTC.balanceOf(keeperImport.address);
             expect(wBTCBalance.toString()).equals("400000000");
-            hBTCBalance = await hBTC.balanceOf(keeperHolder.address);
+            hBTCBalance = await hBTC.balanceOf(keeperImport.address);
             expect(hBTCBalance.toString()).equals("2000000000000000000");
 
             await auction.refund({from: keeper1});

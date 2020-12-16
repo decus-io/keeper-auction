@@ -8,7 +8,7 @@ const {
 } = require('./utils/Time');
 
 const ERC20Mock = artifacts.require("ERC20Mock");
-const KeeperHolderHarness = artifacts.require("KeeperHolderHarness");
+const KeeperImportHarness = artifacts.require("KeeperImportHarness");
 const KeeperAuction = artifacts.require("KeeperAuction");
 
 contract("KeeperAuction", accounts => {
@@ -17,14 +17,14 @@ contract("KeeperAuction", accounts => {
     let hBTC;
     let wBTC;
     let auction;
-    let keeperHolder;
+    let keeperImport;
 
     beforeEach(async () => {
         [owner, holder, unbid, keeper1, keeper2, keeper3] = accounts;
         hBTC = await ERC20Mock.new('Huobi Bitcoin', 'HBTC', 18, etherUnsigned(100000000000000000000),  {from: holder});
         wBTC = await ERC20Mock.new('Wrapped Bitcoin', 'WBTC', 8, 20000000000,  {from: holder});
         auction = await KeeperAuction.new([hBTC.address, wBTC.address], 1, 50000000, {from: owner});
-        keeperHolder = await KeeperHolderHarness.new([hBTC.address, wBTC.address]);
+        keeperImport = await KeeperImportHarness.new([hBTC.address, wBTC.address]);
     });
 
     describe('end', () => {
@@ -39,7 +39,7 @@ contract("KeeperAuction", accounts => {
             const blockTimestamp = etherUnsigned(await auction.getBlockTimestamp());
             const deadline = blockTimestamp.plus(2);
 
-            await auction.lockEnd(keeperHolder.address, deadline);
+            await auction.lockEnd(keeperImport.address, deadline);
 
             await timeout(2100);
             await mineBlock();

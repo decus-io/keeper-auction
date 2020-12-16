@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./interfaces/ERC20Interface.sol";
-import "./interfaces/KeeperHolderInterface.sol";
+import "./interfaces/IKeeperImport.sol";
 
 contract KeeperAuction is Ownable {
     using SafeMath for uint256;
@@ -44,7 +44,7 @@ contract KeeperAuction is Ownable {
     event Bidded(address indexed owner, uint index, address indexed token, uint256 amount);
     event Canceled(address indexed owner, uint index, address indexed token, uint256 amount);
     event Refund(address indexed owner, uint index, address indexed token, uint256 amount);
-    event EndLocked(address keeperHolder, uint deadline);
+    event EndLocked(address keeperImport, uint deadline);
     event AuctionEnd(address[] tokens, uint256[] amount, address[] keepers);
 
     mapping(address => Token) public tokens;
@@ -53,7 +53,7 @@ contract KeeperAuction is Ownable {
     address[] public bidders;
     uint public deadline;
     SelectedToken[] public selectedTokens;
-    KeeperHolderInterface public keeperHolder;
+    IKeeperImport public keeperImport;
     bool public ended;
 
     uint256 public MIN_AMOUNT;
@@ -192,13 +192,13 @@ contract KeeperAuction is Ownable {
     }
 
     // Owner operations
-    function lockEnd(KeeperHolderInterface _keeperHolder, uint _deadline) public onlyOwner {
+    function lockEnd(IKeeperImport _keeperImport, uint _deadline) public onlyOwner {
         require(getBlockTimestamp() <= _deadline.sub(MINIMUM_DELAY), "KeeperAuction::lockEnd: deadline error");
         require(getBlockTimestamp() >= _deadline.sub(MAXIMUM_DELAY), "KeeperAuction::lockEnd: deadline too large");
 
-        keeperHolder = _keeperHolder;
+        keeperImport = _keeperImport;
         deadline = _deadline;
-        emit EndLocked(address(_keeperHolder), _deadline);
+        emit EndLocked(address(_keeperImport), _deadline);
     }
 
     function end(address[] memory keepers) public onlyOwner {
@@ -222,11 +222,16 @@ contract KeeperAuction is Ownable {
                 "KeeperAuction::end: error selected keepers");
         }
 
+        uint256[] memory _keeperAmounts = new uint256[](keepers.length * selectedTokens.length);
+
         for (uint i = 0; i < keepers.length; i++) {
             uint256 remainAmount = min;
             UserBids storage _userBids = userBids[keepers[i]];
             _userBids.amount = _userBids.amount.sub(min);
             uint[] storage _bid_indexes = _userBids.bids;
+
+            uint _base = i * selectedTokens.length;
+
             for (uint j = 0; j < _bid_indexes.length; j++) {
                 uint _index = _bid_indexes[j];
                 Bid storage _bid = bids[_index];
@@ -247,6 +252,7 @@ contract KeeperAuction is Ownable {
                 }
                 _bid.selectedAmount = itemAmount;
                 selectedTokens[token.index].amount = selectedTokens[token.index].amount.add(itemAmount);
+                _keeperAmounts[_base + token.index] = _keeperAmounts[_base + token.index].add(itemAmount);
 
                 if (remainAmount == 0) {
                     break;
@@ -260,9 +266,9 @@ contract KeeperAuction is Ownable {
             ERC20Interface token = ERC20Interface(selectedTokens[i].token);
             _tokens[i] = selectedTokens[i].token;
             _amounts[i] = selectedTokens[i].amount;
-            require(token.approve(address(keeperHolder), selectedTokens[i].amount), "KeeperAuction::end: approve fail");
+            require(token.approve(address(keeperImport), selectedTokens[i].amount), "KeeperAuction::end: approve fail");
         }
-        require(keeperHolder.add(_tokens, _amounts, keepers),  "KeeperAuction::end: add keepers fail");
+        require(keeperImport.importKeepers(address(this), _tokens, _amounts, keepers, _keeperAmounts),  "KeeperAuction::end: add keepers fail");
         ended = true;
         emit AuctionEnd(_tokens, _amounts, keepers);
     }
