@@ -46,6 +46,7 @@ contract KeeperAuction is Ownable {
     event Refund(address indexed owner, uint index, address indexed token, uint256 amount);
     event EndLocked(address keeperImport, uint deadline);
     event AuctionEnd(address[] tokens, uint256[] amount, address[] keepers);
+    event AuctionFailed();
 
     mapping(address => Token) public tokens;
     mapping(address => UserBids) public userBids;
@@ -271,6 +272,14 @@ contract KeeperAuction is Ownable {
         require(keeperImport.importKeepers(address(this), _tokens, _amounts, keepers, _keeperAmounts),  "KeeperAuction::end: add keepers fail");
         ended = true;
         emit AuctionEnd(_tokens, _amounts, keepers);
+    }
+
+    function fail() public onlyOwner {
+        require(!ended, "KeeperAuction::fail: already ended");
+        require(getBlockTimestamp() >= deadline, "KeeperAuction::fail: can't end before deadline");
+        ended = true;
+
+        emit AuctionFailed();
     }
 
     function getBlockTimestamp() public view returns (uint) {
